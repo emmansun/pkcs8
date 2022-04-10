@@ -1,7 +1,6 @@
 package pkcs8
 
 import (
-	"crypto"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509/pkix"
@@ -9,13 +8,16 @@ import (
 	"errors"
 	"hash"
 
+	"github.com/emmansun/gmsm/sm3"
 	"golang.org/x/crypto/pbkdf2"
 )
 
+// http://gmssl.org/docs/oid.html
 var (
-	oidPKCS5PBKDF2        = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
-	oidHMACWithSHA1       = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 7}
-	oidHMACWithSHA256     = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 9}
+	oidPKCS5PBKDF2    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
+	oidHMACWithSHA1   = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 7}
+	oidHMACWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 9}
+	oidHMACWithSM3    = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 401, 2}
 )
 
 func init() {
@@ -30,21 +32,28 @@ func newHashFromPRF(ai pkix.AlgorithmIdentifier) (func() hash.Hash, error) {
 		return sha1.New, nil
 	case ai.Algorithm.Equal(oidHMACWithSHA256):
 		return sha256.New, nil
+	case ai.Algorithm.Equal(oidHMACWithSM3):
+		return sm3.New, nil
 	default:
 		return nil, errors.New("pkcs8: unsupported hash function")
 	}
 }
 
-func newPRFParamFromHash(h crypto.Hash) (pkix.AlgorithmIdentifier, error) {
+func newPRFParamFromHash(h Hash) (pkix.AlgorithmIdentifier, error) {
 	switch h {
-	case crypto.SHA1:
+	case SHA1:
 		return pkix.AlgorithmIdentifier{
 			Algorithm:  oidHMACWithSHA1,
 			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
-	case crypto.SHA256:
+	case SHA256:
 		return pkix.AlgorithmIdentifier{
 			Algorithm:  oidHMACWithSHA256,
 			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
+	case SM3:
+		return pkix.AlgorithmIdentifier{
+			Algorithm:  oidHMACWithSM3,
+			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
+
 	}
 	return pkix.AlgorithmIdentifier{}, errors.New("pkcs8: unsupported hash function")
 }
@@ -67,7 +76,7 @@ func (p pbkdf2Params) DeriveKey(password []byte, size int) (key []byte, err erro
 type PBKDF2Opts struct {
 	SaltSize       int
 	IterationCount int
-	HMACHash       crypto.Hash
+	HMACHash       Hash
 }
 
 func (p PBKDF2Opts) DeriveKey(password, salt []byte, size int) (

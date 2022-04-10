@@ -1,7 +1,6 @@
 package pkcs8_test
 
 import (
-	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,7 +8,8 @@ import (
 	"encoding/pem"
 	"testing"
 
-	"github.com/youmark/pkcs8"
+	"github.com/emmansun/gmsm/sm2"
+	"github.com/emmansun/pkcs8"
 )
 
 const rsa2048 = `-----BEGIN PRIVATE KEY-----
@@ -399,9 +399,18 @@ func TestMarshalPrivateKey(t *testing.T) {
 		{
 			password: []byte("password"),
 			opts: &pkcs8.Opts{
+				Cipher: pkcs8.SM4CBC,
+				KDFOpts: pkcs8.PBKDF2Opts{
+					SaltSize: 8, IterationCount: 2048, HMACHash: pkcs8.SM3,
+				},
+			},
+		},
+		{
+			password: []byte("password"),
+			opts: &pkcs8.Opts{
 				Cipher: pkcs8.AES128CBC,
 				KDFOpts: pkcs8.PBKDF2Opts{
-					SaltSize: 8, IterationCount: 2048, HMACHash: crypto.SHA256,
+					SaltSize: 8, IterationCount: 2048, HMACHash: pkcs8.SHA256,
 				},
 			},
 		},
@@ -410,7 +419,7 @@ func TestMarshalPrivateKey(t *testing.T) {
 			opts: &pkcs8.Opts{
 				Cipher: pkcs8.AES192CBC,
 				KDFOpts: pkcs8.PBKDF2Opts{
-					SaltSize: 8, IterationCount: 1000, HMACHash: crypto.SHA256,
+					SaltSize: 8, IterationCount: 1000, HMACHash: pkcs8.SHA256,
 				},
 			},
 		},
@@ -419,7 +428,7 @@ func TestMarshalPrivateKey(t *testing.T) {
 			opts: &pkcs8.Opts{
 				Cipher: pkcs8.AES256CBC,
 				KDFOpts: pkcs8.PBKDF2Opts{
-					SaltSize: 16, IterationCount: 2000, HMACHash: crypto.SHA256,
+					SaltSize: 16, IterationCount: 2000, HMACHash: pkcs8.SHA256,
 				},
 			},
 		},
@@ -428,7 +437,7 @@ func TestMarshalPrivateKey(t *testing.T) {
 			opts: &pkcs8.Opts{
 				Cipher: pkcs8.AES128GCM,
 				KDFOpts: pkcs8.PBKDF2Opts{
-					SaltSize: 8, IterationCount: 2048, HMACHash: crypto.SHA256,
+					SaltSize: 8, IterationCount: 2048, HMACHash: pkcs8.SHA256,
 				},
 			},
 		},
@@ -437,7 +446,7 @@ func TestMarshalPrivateKey(t *testing.T) {
 			opts: &pkcs8.Opts{
 				Cipher: pkcs8.AES192GCM,
 				KDFOpts: pkcs8.PBKDF2Opts{
-					SaltSize: 8, IterationCount: 10000, HMACHash: crypto.SHA256,
+					SaltSize: 8, IterationCount: 10000, HMACHash: pkcs8.SHA256,
 				},
 			},
 		},
@@ -446,7 +455,7 @@ func TestMarshalPrivateKey(t *testing.T) {
 			opts: &pkcs8.Opts{
 				Cipher: pkcs8.AES256GCM,
 				KDFOpts: pkcs8.PBKDF2Opts{
-					SaltSize: 16, IterationCount: 16, HMACHash: crypto.SHA256,
+					SaltSize: 16, IterationCount: 16, HMACHash: pkcs8.SHA256,
 				},
 			},
 		},
@@ -455,7 +464,7 @@ func TestMarshalPrivateKey(t *testing.T) {
 			opts: &pkcs8.Opts{
 				Cipher: pkcs8.TripleDESCBC,
 				KDFOpts: pkcs8.PBKDF2Opts{
-					SaltSize: 16, IterationCount: 16, HMACHash: crypto.SHA1,
+					SaltSize: 16, IterationCount: 16, HMACHash: pkcs8.SHA1,
 				},
 			},
 		},
@@ -485,6 +494,24 @@ func TestMarshalPrivateKey(t *testing.T) {
 			t.Fatalf("%d: ParsePKCS8PrivateKey returned: %s", i, err)
 		}
 		if rsaPrivateKey.D.Cmp(decodedRSAPrivateKey.(*rsa.PrivateKey).D) != 0 {
+			t.Fatalf("%d: Decoded key does not match original key", i)
+		}
+
+		sm2PrivateKey, err := sm2.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatalf("%d: GenerateKey returned: %s", i, err)
+		}
+
+		der, err = pkcs8.MarshalPrivateKey(sm2PrivateKey, tt.password, tt.opts)
+		if err != nil {
+			t.Fatalf("%d: MarshalPrivateKey returned: %s", i, err)
+		}
+
+		decodedSM2PrivateKey, _, err := pkcs8.ParsePrivateKey(der, tt.password)
+		if err != nil {
+			t.Fatalf("%d: ParsePKCS8PrivateKey returned: %s", i, err)
+		}
+		if !sm2PrivateKey.Equal(decodedSM2PrivateKey) {
 			t.Fatalf("%d: Decoded key does not match original key", i)
 		}
 

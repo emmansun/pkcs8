@@ -2,16 +2,51 @@
 package pkcs8
 
 import (
-	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
 	"fmt"
+	"hash"
+	"strconv"
+
+	"github.com/emmansun/gmsm/sm2"
+	"github.com/emmansun/gmsm/sm3"
+	"github.com/emmansun/gmsm/smx509"
 )
+
+// Hash identifies a cryptographic hash function that is implemented in another
+// package.
+type Hash uint
+
+const (
+	SHA1 Hash = 1 + iota
+	SHA256
+	SM3
+)
+
+// HashFunc simply returns the value of h so that Hash implements SignerOpts.
+func (h Hash) HashFunc() Hash {
+	return h
+}
+
+// New returns a new hash.Hash calculating the given hash function. New panics
+// if the hash function is not linked into the binary.
+func (h Hash) New() hash.Hash {
+	switch h {
+	case SM3:
+		return sm3.New()
+	case SHA1:
+		return sha1.New()
+	case SHA256:
+		return sha256.New()
+	}
+	panic("pkcs8: requested hash function #" + strconv.Itoa(int(h)) + " is unavailable")
+}
 
 // DefaultOpts are the default options for encrypting a key if none are given.
 // The defaults can be changed by the library user.
@@ -20,7 +55,7 @@ var DefaultOpts = &Opts{
 	KDFOpts: PBKDF2Opts{
 		SaltSize:       8,
 		IterationCount: 10000,
-		HMACHash:       crypto.SHA256,
+		HMACHash:       SHA256,
 	},
 }
 
@@ -136,7 +171,7 @@ func parseEncryptionScheme(encryptionScheme pkix.AlgorithmIdentifier) (Cipher, [
 func ParsePrivateKey(der []byte, password []byte) (interface{}, KDFParameters, error) {
 	// No password provided, assume the private key is unencrypted
 	if len(password) == 0 {
-		privateKey, err := x509.ParsePKCS8PrivateKey(der)
+		privateKey, err := smx509.ParsePKCS8PrivateKey(der)
 		return privateKey, nil, err
 	}
 
@@ -177,7 +212,7 @@ func ParsePrivateKey(der []byte, password []byte) (interface{}, KDFParameters, e
 		return nil, nil, err
 	}
 
-	key, err := x509.ParsePKCS8PrivateKey(decryptedKey)
+	key, err := smx509.ParsePKCS8PrivateKey(decryptedKey)
 	if err != nil {
 		return nil, nil, errors.New("pkcs8: incorrect password")
 	}
@@ -188,7 +223,7 @@ func ParsePrivateKey(der []byte, password []byte) (interface{}, KDFParameters, e
 // Password can be nil.
 func MarshalPrivateKey(priv interface{}, password []byte, opts *Opts) ([]byte, error) {
 	if len(password) == 0 {
-		return x509.MarshalPKCS8PrivateKey(priv)
+		return smx509.MarshalPKCS8PrivateKey(priv)
 	}
 
 	if opts == nil {
@@ -196,7 +231,7 @@ func MarshalPrivateKey(priv interface{}, password []byte, opts *Opts) ([]byte, e
 	}
 
 	// Convert private key into PKCS8 format
-	pkey, err := x509.MarshalPKCS8PrivateKey(priv)
+	pkey, err := smx509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +327,18 @@ func ParsePKCS8PrivateKeyECDSA(der []byte, v ...[]byte) (*ecdsa.PrivateKey, erro
 	typedKey, ok := key.(*ecdsa.PrivateKey)
 	if !ok {
 		return nil, errors.New("key block is not of type ECDSA")
+	}
+	return typedKey, nil
+}
+
+func ParsePKCS8PrivateKeySM2(der []byte, v ...[]byte) (*sm2.PrivateKey, error) {
+	key, err := ParsePKCS8PrivateKey(der, v...)
+	if err != nil {
+		return nil, err
+	}
+	typedKey, ok := key.(*sm2.PrivateKey)
+	if !ok {
+		return nil, errors.New("key block is not of type SM2")
 	}
 	return typedKey, nil
 }
