@@ -408,6 +408,15 @@ func TestMarshalPrivateKey(t *testing.T) {
 		{
 			password: []byte("password"),
 			opts: &pkcs8.Opts{
+				Cipher: pkcs8.SM4GCM,
+				KDFOpts: pkcs8.PBKDF2Opts{
+					SaltSize: 8, IterationCount: 2048, HMACHash: pkcs8.SM3,
+				},
+			},
+		},
+		{
+			password: []byte("password"),
+			opts: &pkcs8.Opts{
 				Cipher: pkcs8.AES128CBC,
 				KDFOpts: pkcs8.PBKDF2Opts{
 					SaltSize: 8, IterationCount: 2048, HMACHash: pkcs8.SHA256,

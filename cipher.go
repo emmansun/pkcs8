@@ -1,9 +1,10 @@
 package pkcs8
 
 import (
-	"bytes"
 	"crypto/cipher"
 	"encoding/asn1"
+
+	"github.com/emmansun/gmsm/padding"
 )
 
 type cipherWithBlock struct {
@@ -43,18 +44,45 @@ func (c cipherWithBlock) Decrypt(key, iv, ciphertext []byte) ([]byte, error) {
 
 func cbcEncrypt(block cipher.Block, key, iv, plaintext []byte) ([]byte, error) {
 	mode := cipher.NewCBCEncrypter(block, iv)
-	paddingLen := block.BlockSize() - (len(plaintext) % block.BlockSize())
-	ciphertext := make([]byte, len(plaintext)+paddingLen)
-	copy(ciphertext, plaintext)
-	copy(ciphertext[len(plaintext):], bytes.Repeat([]byte{byte(paddingLen)}, paddingLen))
-	mode.CryptBlocks(ciphertext, ciphertext)
+	pkcs7 := padding.NewPKCS7Padding(uint(block.BlockSize()))
+	plainText := pkcs7.Pad(plaintext)
+	ciphertext := make([]byte, len(plainText))
+	mode.CryptBlocks(ciphertext, plainText)
 	return ciphertext, nil
 }
 
 func cbcDecrypt(block cipher.Block, key, iv, ciphertext []byte) ([]byte, error) {
 	mode := cipher.NewCBCDecrypter(block, iv)
+	pkcs7 := padding.NewPKCS7Padding(uint(block.BlockSize()))
 	plaintext := make([]byte, len(ciphertext))
 	mode.CryptBlocks(plaintext, ciphertext)
-	// TODO: remove padding
-	return plaintext, nil
+	return pkcs7.Unpad(plaintext)
+}
+
+type cipherWithGCM struct {
+	cipherWithBlock
+}
+
+func (c cipherWithGCM) Encrypt(key, iv, plaintext []byte) ([]byte, error) {
+	block, err := c.newBlock(key)
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCMWithNonceSize(block, len(iv))
+	if err != nil {
+		return nil, err
+	}
+	return aead.Seal(nil, iv, plaintext, nil), nil
+}
+
+func (c cipherWithGCM) Decrypt(key, iv, ciphertext []byte) ([]byte, error) {
+	block, err := c.newBlock(key)
+	if err != nil {
+		return nil, err
+	}
+	aead, err := cipher.NewGCMWithNonceSize(block, len(iv))
+	if err != nil {
+		return nil, err
+	}
+	return aead.Open(nil, iv, ciphertext, nil)
 }
