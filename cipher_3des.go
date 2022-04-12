@@ -11,7 +11,7 @@ var (
 
 func init() {
 	RegisterCipher(oidDESEDE3CBC, func() Cipher {
-		return TripleDESCBC
+		return &TripleDESCBC
 	})
 }
 

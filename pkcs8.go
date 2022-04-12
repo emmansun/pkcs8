@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
@@ -25,7 +26,10 @@ type Hash uint
 
 const (
 	SHA1 Hash = 1 + iota
+	SHA224
 	SHA256
+	SHA384
+	SHA512
 	SM3
 )
 
@@ -42,8 +46,14 @@ func (h Hash) New() hash.Hash {
 		return sm3.New()
 	case SHA1:
 		return sha1.New()
+	case SHA224:
+		return sha256.New224()
 	case SHA256:
 		return sha256.New()
+	case SHA384:
+		return sha512.New384()
+	case SHA512:
+		return sha512.New()
 	}
 	panic("pkcs8: requested hash function #" + strconv.Itoa(int(h)) + " is unavailable")
 }

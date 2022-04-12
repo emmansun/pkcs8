@@ -3,6 +3,7 @@ package pkcs8
 import (
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
@@ -16,7 +17,10 @@ import (
 var (
 	oidPKCS5PBKDF2    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
 	oidHMACWithSHA1   = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 7}
+	oidHMACWithSHA224 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 8}
 	oidHMACWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 9}
+	oidHMACWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 10}
+	oidHMACWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 11}
 	oidHMACWithSM3    = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 401, 2}
 )
 
@@ -30,8 +34,14 @@ func newHashFromPRF(ai pkix.AlgorithmIdentifier) (func() hash.Hash, error) {
 	switch {
 	case len(ai.Algorithm) == 0 || ai.Algorithm.Equal(oidHMACWithSHA1):
 		return sha1.New, nil
+	case ai.Algorithm.Equal(oidHMACWithSHA224):
+		return sha256.New224, nil
 	case ai.Algorithm.Equal(oidHMACWithSHA256):
 		return sha256.New, nil
+	case ai.Algorithm.Equal(oidHMACWithSHA384):
+		return sha512.New384, nil
+	case ai.Algorithm.Equal(oidHMACWithSHA512):
+		return sha512.New, nil
 	case ai.Algorithm.Equal(oidHMACWithSM3):
 		return sm3.New, nil
 	default:
@@ -45,9 +55,21 @@ func newPRFParamFromHash(h Hash) (pkix.AlgorithmIdentifier, error) {
 		return pkix.AlgorithmIdentifier{
 			Algorithm:  oidHMACWithSHA1,
 			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
+	case SHA224:
+		return pkix.AlgorithmIdentifier{
+			Algorithm:  oidHMACWithSHA224,
+			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
 	case SHA256:
 		return pkix.AlgorithmIdentifier{
 			Algorithm:  oidHMACWithSHA256,
+			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
+	case SHA384:
+		return pkix.AlgorithmIdentifier{
+			Algorithm:  oidHMACWithSHA384,
+			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
+	case SHA512:
+		return pkix.AlgorithmIdentifier{
+			Algorithm:  oidHMACWithSHA512,
 			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
 	case SM3:
 		return pkix.AlgorithmIdentifier{

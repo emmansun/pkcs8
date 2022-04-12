@@ -13,10 +13,10 @@ var (
 
 func init() {
 	RegisterCipher(oidSM4CBC, func() Cipher {
-		return SM4CBC
+		return &SM4CBC
 	})
 	RegisterCipher(oidSM4GCM, func() Cipher {
-		return SM4GCM
+		return &SM4GCM
 	})
 }
 
@@ -30,8 +30,8 @@ var SM4CBC = cipherWithBlock{
 
 // SM4GCM is the 128-bit key SM4 cipher in GCM mode.
 var SM4GCM = cipherWithGCM{
-	nonceSize:    12,
-	keySize:  16,
-	newBlock: sm4.NewCipher,
-	oid:      oidSM4GCM,
+	nonceSize: 12,
+	keySize:   16,
+	newBlock:  sm4.NewCipher,
+	oid:       oidSM4GCM,
 }
