@@ -4,5 +4,5 @@ go 1.16
 
 require (
 	github.com/emmansun/gmsm v0.11.4
-	golang.org/x/crypto v0.0.0-20220408190544-5352b0902921
+	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 )
