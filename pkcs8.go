@@ -230,12 +230,7 @@ func MarshalPrivateKey(priv interface{}, password []byte, opts *Opts) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	/*
-		iv := make([]byte, encAlg.IVSize())
-		_, err = rand.Read(iv)
-		if err != nil {
-			return nil, err
-		}*/
+
 	key, kdfParams, err := opts.KDFOpts.DeriveKey(password, salt, encAlg.KeySize())
 	if err != nil {
 		return nil, err
@@ -254,17 +249,7 @@ func MarshalPrivateKey(priv interface{}, password []byte, opts *Opts) ([]byte, e
 		Algorithm:  opts.KDFOpts.OID(),
 		Parameters: asn1.RawValue{FullBytes: marshalledParams},
 	}
-	/*
-		marshalledIV, err := asn1.Marshal(iv)
-		if err != nil {
-			return nil, err
-		}
 
-			encryptionScheme := pkix.AlgorithmIdentifier{
-				Algorithm:  encAlg.OID(),
-				Parameters: asn1.RawValue{FullBytes: marshalledIV},
-			}
-	*/
 	encryptionAlgorithmParams := pbes2Params{
 		EncryptionScheme:  *encryptionScheme,
 		KeyDerivationFunc: keyDerivationFunc,
