@@ -88,16 +88,19 @@ func RegisterKDF(oid asn1.ObjectIdentifier, params func() KDFParameters) {
 	kdfs[oid.String()] = params
 }
 
+type encryptedPrivateKeyInfo struct {
+	EncryptionAlgorithm pkix.AlgorithmIdentifier
+	EncryptedData       []byte
+}
+
 // Cipher represents a cipher for encrypting the key material.
 type Cipher interface {
-	// IVSize returns the IV size of the cipher, in bytes.
-	IVSize() int
 	// KeySize returns the key size of the cipher, in bytes.
 	KeySize() int
 	// Encrypt encrypts the key material.
-	Encrypt(key, iv, plaintext []byte) ([]byte, error)
+	Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error)
 	// Decrypt decrypts the key material.
-	Decrypt(key, iv, ciphertext []byte) ([]byte, error)
+	Decrypt(key []byte, parameters *asn1.RawValue, encryptedKey []byte) ([]byte, error)
 	// OID returns the OID of the cipher specified.
 	OID() asn1.ObjectIdentifier
 }
@@ -121,20 +124,9 @@ var (
 	oidPBES2 = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 13}
 )
 
-type encryptedPrivateKeyInfo struct {
-	EncryptionAlgorithm pkix.AlgorithmIdentifier
-	EncryptedData       []byte
-}
-
 type pbes2Params struct {
 	KeyDerivationFunc pkix.AlgorithmIdentifier
 	EncryptionScheme  pkix.AlgorithmIdentifier
-}
-
-type privateKeyInfo struct {
-	Version             int
-	PrivateKeyAlgorithm pkix.AlgorithmIdentifier
-	PrivateKey          []byte
 }
 
 func parseKeyDerivationFunc(keyDerivationFunc pkix.AlgorithmIdentifier) (KDFParameters, error) {
@@ -151,18 +143,14 @@ func parseKeyDerivationFunc(keyDerivationFunc pkix.AlgorithmIdentifier) (KDFPara
 	return params, nil
 }
 
-func parseEncryptionScheme(encryptionScheme pkix.AlgorithmIdentifier) (Cipher, []byte, error) {
+func parseEncryptionScheme(encryptionScheme *pkix.AlgorithmIdentifier) (Cipher, error) {
 	oid := encryptionScheme.Algorithm.String()
 	newCipher, ok := ciphers[oid]
 	if !ok {
-		return nil, nil, fmt.Errorf("pkcs8: unsupported cipher (OID: %s)", oid)
+		return nil, fmt.Errorf("pkcs8: unsupported cipher (OID: %s)", oid)
 	}
 	cipher := newCipher()
-	var iv []byte
-	if _, err := asn1.Unmarshal(encryptionScheme.Parameters.FullBytes, &iv); err != nil {
-		return nil, nil, errors.New("pkcs8: invalid cipher parameters")
-	}
-	return cipher, iv, nil
+	return cipher, nil
 }
 
 // ParsePrivateKey parses a DER-encoded PKCS#8 private key.
@@ -190,7 +178,7 @@ func ParsePrivateKey(der []byte, password []byte) (interface{}, KDFParameters, e
 		return nil, nil, errors.New("pkcs8: invalid PBES2 parameters")
 	}
 
-	cipher, iv, err := parseEncryptionScheme(params.EncryptionScheme)
+	cipher, err := parseEncryptionScheme(&params.EncryptionScheme)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -207,7 +195,7 @@ func ParsePrivateKey(der []byte, password []byte) (interface{}, KDFParameters, e
 	}
 
 	encryptedKey := privKey.EncryptedData
-	decryptedKey, err := cipher.Decrypt(symkey, iv, encryptedKey)
+	decryptedKey, err := cipher.Decrypt(symkey, &params.EncryptionScheme.Parameters, encryptedKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -242,17 +230,18 @@ func MarshalPrivateKey(priv interface{}, password []byte, opts *Opts) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	iv := make([]byte, encAlg.IVSize())
-	_, err = rand.Read(iv)
-	if err != nil {
-		return nil, err
-	}
+	/*
+		iv := make([]byte, encAlg.IVSize())
+		_, err = rand.Read(iv)
+		if err != nil {
+			return nil, err
+		}*/
 	key, kdfParams, err := opts.KDFOpts.DeriveKey(password, salt, encAlg.KeySize())
 	if err != nil {
 		return nil, err
 	}
 
-	encryptedKey, err := encAlg.Encrypt(key, iv, pkey)
+	encryptionScheme, encryptedKey, err := encAlg.Encrypt(key, pkey)
 	if err != nil {
 		return nil, err
 	}
@@ -265,17 +254,19 @@ func MarshalPrivateKey(priv interface{}, password []byte, opts *Opts) ([]byte, e
 		Algorithm:  opts.KDFOpts.OID(),
 		Parameters: asn1.RawValue{FullBytes: marshalledParams},
 	}
-	marshalledIV, err := asn1.Marshal(iv)
-	if err != nil {
-		return nil, err
-	}
-	encryptionScheme := pkix.AlgorithmIdentifier{
-		Algorithm:  encAlg.OID(),
-		Parameters: asn1.RawValue{FullBytes: marshalledIV},
-	}
+	/*
+		marshalledIV, err := asn1.Marshal(iv)
+		if err != nil {
+			return nil, err
+		}
 
+			encryptionScheme := pkix.AlgorithmIdentifier{
+				Algorithm:  encAlg.OID(),
+				Parameters: asn1.RawValue{FullBytes: marshalledIV},
+			}
+	*/
 	encryptionAlgorithmParams := pbes2Params{
-		EncryptionScheme:  encryptionScheme,
+		EncryptionScheme:  *encryptionScheme,
 		KeyDerivationFunc: keyDerivationFunc,
 	}
 	marshalledEncryptionAlgorithmParams, err := asn1.Marshal(encryptionAlgorithmParams)

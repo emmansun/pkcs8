@@ -2,20 +2,25 @@ package pkcs8
 
 import (
 	"crypto/cipher"
+	"crypto/rand"
+	"crypto/x509/pkix"
 	"encoding/asn1"
+	"errors"
 
 	"github.com/emmansun/gmsm/padding"
 )
+
+func genRandom(len int) ([]byte, error) {
+	value := make([]byte, len)
+	_, err := rand.Read(value)
+	return value, err
+}
 
 type cipherWithBlock struct {
 	oid      asn1.ObjectIdentifier
 	ivSize   int
 	keySize  int
 	newBlock func(key []byte) (cipher.Block, error)
-}
-
-func (c cipherWithBlock) IVSize() int {
-	return c.ivSize
 }
 
 func (c cipherWithBlock) KeySize() int {
@@ -26,20 +31,43 @@ func (c cipherWithBlock) OID() asn1.ObjectIdentifier {
 	return c.oid
 }
 
-func (c cipherWithBlock) Encrypt(key, iv, plaintext []byte) ([]byte, error) {
+func (c cipherWithBlock) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error) {
 	block, err := c.newBlock(key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return cbcEncrypt(block, key, iv, plaintext)
+	iv, err := genRandom(c.ivSize)
+	if err != nil {
+		return nil, nil, err
+	}
+	ciphertext, err := cbcEncrypt(block, key, iv, plaintext)
+	if err != nil {
+		return nil, nil, err
+	}
+	marshalledIV, err := asn1.Marshal(iv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	encryptionScheme := pkix.AlgorithmIdentifier{
+		Algorithm:  c.oid,
+		Parameters: asn1.RawValue{FullBytes: marshalledIV},
+	}
+	return &encryptionScheme, ciphertext, nil
 }
 
-func (c cipherWithBlock) Decrypt(key, iv, ciphertext []byte) ([]byte, error) {
+func (c cipherWithBlock) Decrypt(key []byte, parameters *asn1.RawValue, encryptedKey []byte) ([]byte, error) {
 	block, err := c.newBlock(key)
 	if err != nil {
 		return nil, err
 	}
-	return cbcDecrypt(block, key, iv, ciphertext)
+
+	var iv []byte
+	if _, err := asn1.Unmarshal(parameters.FullBytes, &iv); err != nil {
+		return nil, errors.New("pkcs8: invalid cipher parameters")
+	}
+
+	return cbcDecrypt(block, key, iv, encryptedKey)
 }
 
 func cbcEncrypt(block cipher.Block, key, iv, plaintext []byte) ([]byte, error) {
@@ -60,29 +88,75 @@ func cbcDecrypt(block cipher.Block, key, iv, ciphertext []byte) ([]byte, error) 
 }
 
 type cipherWithGCM struct {
-	cipherWithBlock
+	oid       asn1.ObjectIdentifier
+	nonceSize int
+	keySize   int
+	newBlock  func(key []byte) (cipher.Block, error)
 }
 
-func (c cipherWithGCM) Encrypt(key, iv, plaintext []byte) ([]byte, error) {
+type gcmParameters struct {
+	Nonce  []byte `asn1:"tag:4"`
+	ICVLen int
+}
+
+func (c cipherWithGCM) KeySize() int {
+	return c.keySize
+}
+
+func (c cipherWithGCM) OID() asn1.ObjectIdentifier {
+	return c.oid
+}
+
+func (c cipherWithGCM) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifier, []byte, error) {
+	block, err := c.newBlock(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	nonce, err := genRandom(c.nonceSize)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	aead, err := cipher.NewGCMWithNonceSize(block, c.nonceSize)
+	if err != nil {
+		return nil, nil, err
+	}
+	ciphertext := aead.Seal(nil, nonce, plaintext, nil)
+	paramSeq := gcmParameters{
+		Nonce:  nonce,
+		ICVLen: aead.Overhead(),
+	}
+	paramBytes, err := asn1.Marshal(paramSeq)
+	if err != nil {
+		return nil, nil, err
+	}
+	encryptionAlgorithm := pkix.AlgorithmIdentifier{
+		Algorithm: c.oid,
+		Parameters: asn1.RawValue{
+			Tag:   asn1.TagSequence,
+			Bytes: paramBytes,
+		},
+	}
+	return &encryptionAlgorithm, ciphertext, nil
+}
+
+func (c cipherWithGCM) Decrypt(key []byte, parameters *asn1.RawValue, encryptedKey []byte) ([]byte, error) {
 	block, err := c.newBlock(key)
 	if err != nil {
 		return nil, err
 	}
-	aead, err := cipher.NewGCMWithNonceSize(block, len(iv))
+	params := gcmParameters{}
+	_, err = asn1.Unmarshal(parameters.Bytes, &params)
 	if err != nil {
 		return nil, err
 	}
-	return aead.Seal(nil, iv, plaintext, nil), nil
-}
+	aead, err := cipher.NewGCMWithNonceSize(block, len(params.Nonce))
+	if err != nil {
+		return nil, err
+	}
+	if params.ICVLen != aead.Overhead() {
+		return nil, errors.New("pkcs8: invalid tag size")
+	}
 
-func (c cipherWithGCM) Decrypt(key, iv, ciphertext []byte) ([]byte, error) {
-	block, err := c.newBlock(key)
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCMWithNonceSize(block, len(iv))
-	if err != nil {
-		return nil, err
-	}
-	return aead.Open(nil, iv, ciphertext, nil)
+	return aead.Open(nil, params.Nonce, encryptedKey, nil)
 }

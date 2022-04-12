@@ -30,10 +30,8 @@ var SM4CBC = cipherWithBlock{
 
 // SM4GCM is the 128-bit key SM4 cipher in GCM mode.
 var SM4GCM = cipherWithGCM{
-	cipherWithBlock: cipherWithBlock{
-		ivSize:   12,
-		keySize:  16,
-		newBlock: sm4.NewCipher,
-		oid:      oidSM4GCM,		
-	},
+	nonceSize:    12,
+	keySize:  16,
+	newBlock: sm4.NewCipher,
+	oid:      oidSM4GCM,
 }

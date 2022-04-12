@@ -45,12 +45,10 @@ var AES128CBC = cipherWithBlock{
 
 // AES128GCM is the 128-bit key AES cipher in GCM mode.
 var AES128GCM = cipherWithGCM{
-	cipherWithBlock: cipherWithBlock{
-		ivSize:   12,
-		keySize:  16,
-		newBlock: aes.NewCipher,
-		oid:      oidAES128GCM,
-	},
+	nonceSize: 12,
+	keySize:   16,
+	newBlock:  aes.NewCipher,
+	oid:       oidAES128GCM,
 }
 
 // AES192CBC is the 192-bit key AES cipher in CBC mode.
@@ -63,12 +61,10 @@ var AES192CBC = cipherWithBlock{
 
 // AES192GCM is the 912-bit key AES cipher in GCM mode.
 var AES192GCM = cipherWithGCM{
-	cipherWithBlock: cipherWithBlock{
-		ivSize:   12,
-		keySize:  24,
-		newBlock: aes.NewCipher,
-		oid:      oidAES192GCM,
-	},
+	nonceSize: 12,
+	keySize:   24,
+	newBlock:  aes.NewCipher,
+	oid:       oidAES192GCM,
 }
 
 // AES256CBC is the 256-bit key AES cipher in CBC mode.
@@ -81,10 +77,8 @@ var AES256CBC = cipherWithBlock{
 
 // AES256GCM is the 256-bit key AES cipher in GCM mode.
 var AES256GCM = cipherWithGCM{
-	cipherWithBlock: cipherWithBlock{
-		ivSize:   12,
-		keySize:  32,
-		newBlock: aes.NewCipher,
-		oid:      oidAES256GCM,
-	},
+	nonceSize: 12,
+	keySize:   32,
+	newBlock:  aes.NewCipher,
+	oid:       oidAES256GCM,
 }
