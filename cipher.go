@@ -94,6 +94,7 @@ type cipherWithGCM struct {
 	newBlock  func(key []byte) (cipher.Block, error)
 }
 
+// http://javadoc.iaik.tugraz.at/iaik_jce/current/index.html?iaik/security/cipher/GCMParameters.html
 type gcmParameters struct {
 	Nonce  []byte `asn1:"tag:4"`
 	ICVLen int

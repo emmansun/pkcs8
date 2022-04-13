@@ -1,5 +1,9 @@
 package pkcs8
 
+//
+// Reference https://datatracker.ietf.org/doc/html/rfc8018#section-5.2
+//
+
 import (
 	"crypto/sha1"
 	"crypto/sha256"
