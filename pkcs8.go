@@ -30,6 +30,8 @@ const (
 	SHA256
 	SHA384
 	SHA512
+	SHA512_224
+	SHA512_256
 	SM3
 )
 
@@ -54,6 +56,11 @@ func (h Hash) New() hash.Hash {
 		return sha512.New384()
 	case SHA512:
 		return sha512.New()
+	case SHA512_224:
+		return sha512.New512_224()
+	case SHA512_256:
+		return sha512.New512_256()
+		
 	}
 	panic("pkcs8: requested hash function #" + strconv.Itoa(int(h)) + " is unavailable")
 }
@@ -98,6 +105,7 @@ func RegisterKDF(oid asn1.ObjectIdentifier, params func() KDFParameters) {
 	kdfs[oid.String()] = params
 }
 
+// for encrypted private-key information
 type encryptedPrivateKeyInfo struct {
 	EncryptionAlgorithm pkix.AlgorithmIdentifier
 	EncryptedData       []byte
@@ -281,7 +289,8 @@ func MarshalPrivateKey(priv interface{}, password []byte, opts *Opts) ([]byte, e
 	return asn1.Marshal(encryptedPkey)
 }
 
-// ParsePKCS8PrivateKey parses encrypted/unencrypted private keys in PKCS#8 format. To parse encrypted private keys, a password of []byte type should be provided to the function as the second parameter.
+// ParsePKCS8PrivateKey parses encrypted/unencrypted private keys in PKCS#8 format.
+// To parse encrypted private keys, a password of []byte type should be provided to the function as the second parameter.
 func ParsePKCS8PrivateKey(der []byte, v ...[]byte) (interface{}, error) {
 	var password []byte
 	if len(v) > 0 {
@@ -291,7 +300,8 @@ func ParsePKCS8PrivateKey(der []byte, v ...[]byte) (interface{}, error) {
 	return privateKey, err
 }
 
-// ParsePKCS8PrivateKeyRSA parses encrypted/unencrypted private keys in PKCS#8 format. To parse encrypted private keys, a password of []byte type should be provided to the function as the second parameter.
+// ParsePKCS8PrivateKeyRSA parses encrypted/unencrypted private keys in PKCS#8 format.
+// To parse encrypted private keys, a password of []byte type should be provided to the function as the second parameter.
 func ParsePKCS8PrivateKeyRSA(der []byte, v ...[]byte) (*rsa.PrivateKey, error) {
 	key, err := ParsePKCS8PrivateKey(der, v...)
 	if err != nil {
@@ -299,12 +309,13 @@ func ParsePKCS8PrivateKeyRSA(der []byte, v ...[]byte) (*rsa.PrivateKey, error) {
 	}
 	typedKey, ok := key.(*rsa.PrivateKey)
 	if !ok {
-		return nil, errors.New("key block is not of type RSA")
+		return nil, errors.New("pkcs8: key block is not of type RSA")
 	}
 	return typedKey, nil
 }
 
-// ParsePKCS8PrivateKeyECDSA parses encrypted/unencrypted private keys in PKCS#8 format. To parse encrypted private keys, a password of []byte type should be provided to the function as the second parameter.
+// ParsePKCS8PrivateKeyECDSA parses encrypted/unencrypted private keys in PKCS#8 format.
+// To parse encrypted private keys, a password of []byte type should be provided to the function as the second parameter.
 func ParsePKCS8PrivateKeyECDSA(der []byte, v ...[]byte) (*ecdsa.PrivateKey, error) {
 	key, err := ParsePKCS8PrivateKey(der, v...)
 	if err != nil {
@@ -312,11 +323,13 @@ func ParsePKCS8PrivateKeyECDSA(der []byte, v ...[]byte) (*ecdsa.PrivateKey, erro
 	}
 	typedKey, ok := key.(*ecdsa.PrivateKey)
 	if !ok {
-		return nil, errors.New("key block is not of type ECDSA")
+		return nil, errors.New("pkcs8: key block is not of type ECDSA")
 	}
 	return typedKey, nil
 }
 
+// ParsePKCS8PrivateKeySM2 parses encrypted/unencrypted private keys in PKCS#8 format.
+// To parse encrypted private keys, a password of []byte type should be provided to the function as the second parameter.
 func ParsePKCS8PrivateKeySM2(der []byte, v ...[]byte) (*sm2.PrivateKey, error) {
 	key, err := ParsePKCS8PrivateKey(der, v...)
 	if err != nil {
@@ -324,7 +337,7 @@ func ParsePKCS8PrivateKeySM2(der []byte, v ...[]byte) (*sm2.PrivateKey, error) {
 	}
 	typedKey, ok := key.(*sm2.PrivateKey)
 	if !ok {
-		return nil, errors.New("key block is not of type SM2")
+		return nil, errors.New("pkcs8: key block is not of type SM2")
 	}
 	return typedKey, nil
 }

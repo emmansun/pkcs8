@@ -19,13 +19,15 @@ import (
 
 // http://gmssl.org/docs/oid.html
 var (
-	oidPKCS5PBKDF2    = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
-	oidHMACWithSHA1   = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 7}
-	oidHMACWithSHA224 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 8}
-	oidHMACWithSHA256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 9}
-	oidHMACWithSHA384 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 10}
-	oidHMACWithSHA512 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 11}
-	oidHMACWithSM3    = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 401, 2}
+	oidPKCS5PBKDF2        = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 5, 12}
+	oidHMACWithSHA1       = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 7}
+	oidHMACWithSHA224     = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 8}
+	oidHMACWithSHA256     = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 9}
+	oidHMACWithSHA384     = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 10}
+	oidHMACWithSHA512     = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 11}
+	oidHMACWithSHA512_224 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 12}
+	oidHMACWithSHA512_256 = asn1.ObjectIdentifier{1, 2, 840, 113549, 2, 13}
+	oidHMACWithSM3        = asn1.ObjectIdentifier{1, 2, 156, 10197, 1, 401, 2}
 )
 
 func init() {
@@ -46,6 +48,10 @@ func newHashFromPRF(ai pkix.AlgorithmIdentifier) (func() hash.Hash, error) {
 		return sha512.New384, nil
 	case ai.Algorithm.Equal(oidHMACWithSHA512):
 		return sha512.New, nil
+	case ai.Algorithm.Equal(oidHMACWithSHA512_224):
+		return sha512.New512_224, nil
+	case ai.Algorithm.Equal(oidHMACWithSHA512_256):
+		return sha512.New512_256, nil
 	case ai.Algorithm.Equal(oidHMACWithSM3):
 		return sm3.New, nil
 	default:
@@ -74,6 +80,14 @@ func newPRFParamFromHash(h Hash) (pkix.AlgorithmIdentifier, error) {
 	case SHA512:
 		return pkix.AlgorithmIdentifier{
 			Algorithm:  oidHMACWithSHA512,
+			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
+	case SHA512_224:
+		return pkix.AlgorithmIdentifier{
+			Algorithm:  oidHMACWithSHA512_224,
+			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
+	case SHA512_256:
+		return pkix.AlgorithmIdentifier{
+			Algorithm:  oidHMACWithSHA512_256,
 			Parameters: asn1.RawValue{Tag: asn1.TagNull}}, nil
 	case SM3:
 		return pkix.AlgorithmIdentifier{

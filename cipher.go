@@ -53,6 +53,7 @@ func (c cipherWithBlock) Encrypt(key, plaintext []byte) (*pkix.AlgorithmIdentifi
 		Algorithm:  c.oid,
 		Parameters: asn1.RawValue{FullBytes: marshalledIV},
 	}
+
 	return &encryptionScheme, ciphertext, nil
 }
 
