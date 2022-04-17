@@ -10,6 +10,7 @@ import (
 	"crypto/sha512"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"hash"
@@ -60,7 +61,7 @@ func (h Hash) New() hash.Hash {
 		return sha512.New512_224()
 	case SHA512_256:
 		return sha512.New512_256()
-		
+
 	}
 	panic("pkcs8: requested hash function #" + strconv.Itoa(int(h)) + " is unavailable")
 }
@@ -184,6 +185,9 @@ func ParsePrivateKey(der []byte, password []byte) (interface{}, KDFParameters, e
 	// Use the password provided to decrypt the private key
 	var privKey encryptedPrivateKeyInfo
 	if _, err := asn1.Unmarshal(der, &privKey); err != nil {
+		if block, _ := pem.Decode(der); block != nil {
+			return nil, nil, errors.New("pkcs8: this method just supports DER-encoded key")
+		}
 		return nil, nil, errors.New("pkcs8: only PKCS #5 v2.0 supported")
 	}
 
